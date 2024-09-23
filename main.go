@@ -32,6 +32,7 @@ const (
 	del2    = "delete from input2;"
 	count1  = "select count(id) from input1;"
 	count2  = "select count(id) from input2;"
+	host    = "192.168.1.47:8000"
 )
 
 var tmpl *template.Template
@@ -45,8 +46,8 @@ func main() {
 	router.HandleFunc("/", homeHandler).Methods("GET")
 	router.HandleFunc("/upload", UploadHandler).Methods("POST")
 	router.HandleFunc("/download", DownloadHandler).Methods("GET")
-	log.Println("Server starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Println("Server starting...")
+	log.Fatal(http.ListenAndServe(":8000", router))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +67,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	// open file (check if exists)
 	_, err := os.Open(directory)
 	if err != nil {
-		drawUi(serverMessages, w, "file not found")
+		drawMessage(serverMessages, w, "file not found", "message")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -86,7 +87,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the multipart form, 10 MB max upload size
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		drawUi(serverMessages, w, "10 MB max upload size")
+		drawMessage(serverMessages, w, "10 MB max upload size", "message")
 		return
 	}
 
@@ -94,19 +95,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("avatar")
 	if err != nil {
 		if errors.Is(err, http.ErrMissingFile) {
-			serverMessages = append(serverMessages, "No file submitted")
+			drawMessage(serverMessages, w, "No file submitted", "message")
+			return
 		} else {
-			serverMessages = append(serverMessages, "Error retrieving the file")
-		}
-
-		if len(serverMessages) > 0 {
-			er := tmpl.ExecuteTemplate(w, "messages", serverMessages)
-			if er != nil {
-				log.Println(er)
-			}
+			drawMessage(serverMessages, w, "Error retrieving the file", "message")
 			return
 		}
-
 	}
 	defer func(file multipart.File) {
 		er := file.Close()
@@ -116,12 +110,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}(file)
 
 	// Generate a unique filename to prevent overwriting and conflicts
-	uuid, err := uuid.NewRandom()
+	rnd, err := uuid.NewRandom()
 	if err != nil {
-		drawUi(serverMessages, w, "Error generating unique identifier")
+		drawMessage(serverMessages, w, "Error generating unique identifier", "message")
 		return
 	}
-	filename := uuid.String() + filepath.Ext(handler.Filename) // Append the file extension
+	filename := rnd.String() + filepath.Ext(handler.Filename) // Append the file extension
 
 	// Create the full path for saving the file
 	filePath := filepath.Join("uploads", filename)
@@ -129,7 +123,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Save the file to the server
 	dst, err := os.Create(filePath)
 	if err != nil {
-		drawUi(serverMessages, w, "Error saving the file")
+		drawMessage(serverMessages, w, "Error saving the file", "message")
 		return
 	}
 	defer func(dst *os.File) {
@@ -140,15 +134,11 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}(dst)
 
 	if _, err = io.Copy(dst, file); err != nil {
-		drawUi(serverMessages, w, "Error saving the file")
+		drawMessage(serverMessages, w, "Error saving the file", "message")
 		return
 	}
-
-	serverMessages = append(serverMessages, fmt.Sprintf("%v:%v", "File uploaded:", filename))
-	er := tmpl.ExecuteTemplate(w, "messages", serverMessages)
-	if er != nil {
-		log.Println(er)
-	}
+	resLink := fmt.Sprintf("http://%v/download?name=%v", host, filename)
+	drawMessage(serverMessages, w, resLink, "messages")
 
 	db, err := sql.Open(sqlite3, fmt.Sprintf("file:%v?_foreign_keys=false&cache=shared&mode=rw", dbFile))
 	if err != nil {
@@ -172,7 +162,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		// грузим админку
 		text, e := os.ReadFile(filePath)
 		if e != nil {
-			drawUi(serverMessages, w, e.Error())
+			drawMessage(serverMessages, w, e.Error(), "message")
 			return
 		}
 		var table [][]string
@@ -313,6 +303,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	inpCount2 := execCommandRes(ctx, txr, count2)
 
 	if inpCount1 > 0 && inpCount2 > 0 {
+		drawMessage(serverMessages, w, "Generate report.....", "message")
 		resultFile := excelize.NewFile()
 		_, err = resultFile.NewSheet(sheet1)
 		if err != nil {
@@ -536,29 +527,29 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		er = resultFile.DeleteSheet("Sheet1")
-		if er != nil {
-			log.Println(er)
+		err = resultFile.DeleteSheet("Sheet1")
+		if err != nil {
+			log.Println(err)
 		}
 
 		fn := fmt.Sprintf("result-%v.xlsx", time.Now().UTC().Format("20060102150405"))
-		if er = resultFile.SaveAs("uploads/" + fn); err != nil {
-			log.Println(er)
+		if err = resultFile.SaveAs("uploads/" + fn); err != nil {
+			log.Println(err)
 		}
 		execCommand(ctx, txr, del1)
 		execCommand(ctx, txr, del2)
-		er = txr.Commit()
-		if er != nil {
-			log.Println(er)
+		err = txr.Commit()
+		if err != nil {
+			log.Println(err)
 		}
-		resLink := fmt.Sprintf("http://localhost:8080/download?name=%v", fn)
+		resLink = fmt.Sprintf("http://%v/download?name=%v", host, fn)
 		serverMessages = nil
-		drawUi(serverMessages, w, resLink)
+		drawMessage(serverMessages, w, resLink, "messages")
 
 	} else {
-		er = txr.Rollback()
-		if er != nil {
-			log.Println(er)
+		err = txr.Rollback()
+		if err != nil {
+			log.Println(err)
 		}
 	}
 }
@@ -601,9 +592,9 @@ func execCommand(ctx context.Context, tx *sql.Tx, command string) {
 	}
 }
 
-func drawUi(serverMessages []string, w http.ResponseWriter, message string) {
+func drawMessage(serverMessages []string, w http.ResponseWriter, message string, mesType string) {
 	serverMessages = append(serverMessages, message)
-	er := tmpl.ExecuteTemplate(w, "messages", serverMessages)
+	er := tmpl.ExecuteTemplate(w, mesType, serverMessages)
 	if er != nil {
 		log.Println(er)
 	}

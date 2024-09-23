@@ -1,7 +1,7 @@
 {{define "messages"}}
 <ul>
     {{range .}}
-        <li>{{ . }}</li>
+        <li> <a href={{ . }}> <p>{{ . }}</p> </a> </li>
     {{end}}
 </ul>
 {{end}}
