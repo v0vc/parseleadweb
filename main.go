@@ -32,7 +32,7 @@ const (
 	del2    = "delete from input2;"
 	count1  = "select count(id) from input1;"
 	count2  = "select count(id) from input2;"
-	host    = "127.0.0.1:8080"
+	host    = "localhost:8080"
 )
 
 var tmpl *template.Template
