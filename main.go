@@ -32,7 +32,7 @@ const (
 	del2    = "delete from input2;"
 	count1  = "select count(id) from input1;"
 	count2  = "select count(id) from input2;"
-	host    = "192.168.1.47:8000"
+	host    = "127.0.0.1:8080"
 )
 
 var tmpl *template.Template
@@ -47,7 +47,7 @@ func main() {
 	router.HandleFunc("/upload", UploadHandler).Methods("POST")
 	router.HandleFunc("/download", DownloadHandler).Methods("GET")
 	log.Println("Server starting...")
-	log.Fatal(http.ListenAndServe(":8000", router))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
