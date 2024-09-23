@@ -1,0 +1,30 @@
+{{define "upload"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@2.0.2"></script>
+    <title>Lead Parser</title>
+</head>
+<body>
+    <div class="row">
+        <div class="col-md-4 p-5 mt-4">
+            <h4>Lead Parser</h4>
+            <form class="form">
+                <div id="messages"></div>
+                <div class="mb-3">
+                    <input type="file" class="form-control" id="avatarInput" name="avatar" required>
+                </div>
+                <button 
+                    hx-post="/upload" 
+                    hx-encoding="multipart/form-data" 
+                    hx-target="#messages" 
+                    type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}
