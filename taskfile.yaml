@@ -1,0 +1,28 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  default:
+    - task: update
+    - task: fmt
+    - task: build
+    - task: lint
+    - task: check
+
+  fmt:
+    - goimports -w -l .
+    - gofumpt -w -l .
+
+  lint:
+    - golangci-lint run -v --timeout 10m
+
+  update:
+    - go get -u all
+    - go mod tidy
+
+  build:
+    - go build -ldflags="-s -w" .
+
+  check:
+    - govulncheck ./...

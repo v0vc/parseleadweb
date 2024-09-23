@@ -5,11 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/xuri/excelize/v2"
-	"golang.org/x/net/html"
 	"html/template"
 	"io"
 	"log"
@@ -17,9 +12,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/xuri/excelize/v2"
+	"golang.org/x/net/html"
 )
 
 const (
@@ -63,12 +65,13 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// join to get the full file path
 	directory := filepath.Join("uploads", name)
-	var serverMessages []string
 	// open file (check if exists)
 	_, err := os.Open(directory)
 	if err != nil {
-		drawMessage(serverMessages, w, "file not found", "message")
-		w.WriteHeader(http.StatusNotFound)
+		er := tmpl.ExecuteTemplate(w, "message", []string{"File not found on server!"})
+		if er != nil {
+			log.Println(er)
+		}
 		return
 	}
 
@@ -192,12 +195,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			table = append(table, rowAdm)
 		}
 
-		inp2, err := tx.PrepareContext(ctx, "insert into main.input2(name, active, sorting, moddate, leadid, fio, email, tel, page, utm_source, utm_medium, utm_campaign, utm_content, utm_term) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict do update set fiotel = fiotel+1;")
-		if err != nil {
-			log.Println(err)
+		inp2, er := tx.PrepareContext(ctx, "insert into main.input2(name, active, sorting, moddate, leadid, fio, email, tel, page, utm_source, utm_medium, utm_campaign, utm_content, utm_term) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict do update set fiotel = fiotel+1;")
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(inp2 *sql.Stmt) {
-			er := inp2.Close()
+			er = inp2.Close()
 			if er != nil {
 				log.Println(er)
 			}
@@ -217,18 +220,18 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			tel := spaceStringsBuilder(ri[7])
 			fio := strings.TrimSpace(ri[5])
 
-			_, err = inp2.ExecContext(ctx, strings.TrimSpace(ri[0]), strings.TrimSpace(ri[1]), strings.TrimSpace(ri[2]), strings.TrimSpace(ri[3]), strings.TrimSpace(ri[4]), strings.ToLower(fio), strings.TrimSpace(ri[6]), strings.TrimPrefix(tel, "+"), strings.TrimSpace(ri[8]), strings.TrimSpace(ri[9]), strings.TrimSpace(ri[10]), strings.TrimSpace(ri[11]), strings.TrimSpace(ri[12]), strings.TrimSpace(ri[13]))
+			_, er := inp2.ExecContext(ctx, strings.TrimSpace(ri[0]), strings.TrimSpace(ri[1]), strings.TrimSpace(ri[2]), strings.TrimSpace(ri[3]), strings.TrimSpace(ri[4]), strings.ToLower(fio), strings.TrimSpace(ri[6]), strings.TrimPrefix(tel, "+"), strings.TrimSpace(ri[8]), strings.TrimSpace(ri[9]), strings.TrimSpace(ri[10]), strings.TrimSpace(ri[11]), strings.TrimSpace(ri[12]), strings.TrimSpace(ri[13]))
 
-			if err != nil {
-				log.Println(err)
+			if er != nil {
+				log.Println(er)
 			}
 		}
-		err = tx.Commit()
-		if err != nil {
-			log.Println(err)
+		er = tx.Commit()
+		if er != nil {
+			log.Println(er)
 		}
 	} else {
-		//грузим ексель
+		// грузим ексель
 		defer func() {
 			// Close the spreadsheet.
 			if er := f.Close(); er != nil {
@@ -239,18 +242,18 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		firstSheet := f.WorkBook.Sheets.Sheet[0].Name
 		fmt.Printf("'%s' is first sheet of %d sheets.\n", firstSheet, f.SheetCount)
 		// Get all the rows in the Sheet1.
-		rows, err := f.GetRows(firstSheet)
-		if err != nil {
-			fmt.Println(err)
+		rows, er := f.GetRows(firstSheet)
+		if er != nil {
+			fmt.Println(er)
 			return
 		}
 
-		inp1, err := tx.PrepareContext(ctx, "insert into main.input1(nomer, firstdate, fio, email, tel, status, result, comment, isopen, opendate) values (?,?,?,?,?,?,?,?,?,?) on conflict do update set fiotel = fiotel+1;")
-		if err != nil {
-			log.Println(err)
+		inp1, er := tx.PrepareContext(ctx, "insert into main.input1(nomer, firstdate, fio, email, tel, status, result, comment, isopen, opendate) values (?,?,?,?,?,?,?,?,?,?) on conflict do update set fiotel = fiotel+1;")
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(inp1 *sql.Stmt) {
-			er := inp1.Close()
+			er = inp1.Close()
 			if er != nil {
 				log.Println(er)
 			}
@@ -287,9 +290,9 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(err)
 			}
 		}
-		err = tx.Commit()
-		if err != nil {
-			log.Println(err)
+		er = tx.Commit()
+		if er != nil {
+			log.Println(er)
 		}
 	}
 
@@ -298,7 +301,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	//чекаем заполненность таблиц
+	// чекаем заполненность таблиц
 	inpCount1 := execCommandRes(ctx, txr, count1)
 	inpCount2 := execCommandRes(ctx, txr, count2)
 
@@ -339,45 +342,45 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		sel1, err := txr.PrepareContext(ctx, "select i1.fio, i1.tel, i1.email, i1.firstdate, i1.status, i1.result, i1.comment, i1.isopen, i1.opendate, i1.fiotel, i2.fio, i2.tel, i2.email, i2.name, i2.moddate, i2.page, i2.utm_source, i2.utm_medium, i2.utm_campaign, i2.utm_content, i2.utm_term, i2.fiotel from input1 i1 inner join input2 i2 on i1.tel = i2.tel;")
-		if err != nil {
-			log.Println(err)
+		sel1, er := txr.PrepareContext(ctx, "select i1.fio, i1.tel, i1.email, i1.firstdate, i1.status, i1.result, i1.comment, i1.isopen, i1.opendate, i1.fiotel, i2.fio, i2.tel, i2.email, i2.name, i2.moddate, i2.page, i2.utm_source, i2.utm_medium, i2.utm_campaign, i2.utm_content, i2.utm_term, i2.fiotel from input1 i1 inner join input2 i2 on i1.tel = i2.tel;")
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(sel1 *sql.Stmt) {
-			er := sel1.Close()
+			er = sel1.Close()
 			if er != nil {
 				log.Println(er)
 			}
 		}(sel1)
 
-		sel2, err := txr.PrepareContext(ctx, "select fio, tel, MAX(fiotel) as duplicateCount from input1 group by fiotel having duplicateCount <> 0 order by duplicateCount desc;")
-		if err != nil {
-			log.Println(err)
+		sel2, er := txr.PrepareContext(ctx, "select fio, tel, MAX(fiotel) as duplicateCount from input1 group by fiotel having duplicateCount <> 0 order by duplicateCount desc;")
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(sel2 *sql.Stmt) {
-			er := sel2.Close()
+			er = sel2.Close()
 			if er != nil {
 				log.Println(er)
 			}
 		}(sel2)
 
-		sel3, err := txr.PrepareContext(ctx, "select fio, tel, MAX(fiotel) as duplicateCount from input2 group by fiotel having duplicateCount <> 0 order by duplicateCount desc;")
-		if err != nil {
-			log.Println(err)
+		sel3, er := txr.PrepareContext(ctx, "select fio, tel, MAX(fiotel) as duplicateCount from input2 group by fiotel having duplicateCount <> 0 order by duplicateCount desc;")
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(sel3 *sql.Stmt) {
-			er := sel3.Close()
+			er = sel3.Close()
 			if er != nil {
 				log.Println(er)
 			}
 		}(sel3)
 
-		rows1, err := sel1.QueryContext(ctx)
-		if err != nil {
-			log.Println(err)
+		rows1, er := sel1.QueryContext(ctx)
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(rows1 *sql.Rows) {
-			er := rows1.Close()
+			er = rows1.Close()
 			if er != nil {
 				log.Println(er)
 			}
@@ -386,8 +389,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		var res1 []*Res
 		for rows1.Next() {
 			var res Res
-			if err = rows1.Scan(&res.i1fio, &res.i1tel, &res.i1email, &res.i1firstdate, &res.i1status, &res.i1result, &res.i1comment, &res.i1isopen, &res.i1opendate, &res.i1fiotel, &res.i2fio, &res.i2tel, &res.i2email, &res.i2name, &res.i2moddate, &res.i2page, &res.i2utm_source, &res.i2utm_medium, &res.i2utm_campaign, &res.i2utm_content, &res.i2utm_term, &res.i2fiotel); err != nil {
-				log.Println(err)
+			if er := rows1.Scan(&res.i1fio, &res.i1tel, &res.i1email, &res.i1firstdate, &res.i1status, &res.i1result, &res.i1comment, &res.i1isopen, &res.i1opendate, &res.i1fiotel, &res.i2fio, &res.i2tel, &res.i2email, &res.i2name, &res.i2moddate, &res.i2page, &res.i2utm_source, &res.i2utm_medium, &res.i2utm_campaign, &res.i2utm_content, &res.i2utm_term, &res.i2fiotel); err != nil {
+				log.Println(er)
 			}
 			res1 = append(res1, &res)
 		}
@@ -449,12 +452,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		rows2, err := sel2.QueryContext(ctx)
-		if err != nil {
-			log.Println(err)
+		rows2, er := sel2.QueryContext(ctx)
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(rows2 *sql.Rows) {
-			er := rows2.Close()
+			er = rows2.Close()
 			if er != nil {
 				log.Println(er)
 			}
@@ -463,8 +466,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		var res2 []*Res1
 		for rows2.Next() {
 			var res Res1
-			if err = rows2.Scan(&res.fio, &res.tel, &res.count); err != nil {
-				log.Println(err)
+			if er := rows2.Scan(&res.fio, &res.tel, &res.count); er != nil {
+				log.Println(er)
 			}
 			res2 = append(res2, &res)
 		}
@@ -488,12 +491,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		rows3, err := sel3.QueryContext(ctx)
-		if err != nil {
-			log.Println(err)
+		rows3, er := sel3.QueryContext(ctx)
+		if er != nil {
+			log.Println(er)
 		}
 		defer func(rows3 *sql.Rows) {
-			er := rows3.Close()
+			er = rows3.Close()
 			if er != nil {
 				log.Println(er)
 			}
@@ -502,8 +505,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		var res3 []*Res1
 		for rows3.Next() {
 			var res Res1
-			if err = rows3.Scan(&res.fio, &res.tel, &res.count); err != nil {
-				log.Println(err)
+			if er := rows3.Scan(&res.fio, &res.tel, &res.count); er != nil {
+				log.Println(er)
 			}
 			res3 = append(res3, &res)
 		}
@@ -527,31 +530,54 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = resultFile.DeleteSheet("Sheet1")
-		if err != nil {
-			log.Println(err)
+		er = resultFile.DeleteSheet("Sheet1")
+		if er != nil {
+			log.Println(er)
 		}
 
 		fn := fmt.Sprintf("result-%v.xlsx", time.Now().UTC().Format("20060102150405"))
-		if err = resultFile.SaveAs("uploads/" + fn); err != nil {
-			log.Println(err)
+		fnPath := filepath.Join("uploads", fn)
+		if er = resultFile.SaveAs(fnPath); er != nil {
+			log.Println(er)
 		}
 		execCommand(ctx, txr, del1)
 		execCommand(ctx, txr, del2)
-		err = txr.Commit()
-		if err != nil {
-			log.Println(err)
+		er = txr.Commit()
+		if er != nil {
+			log.Println(er)
 		}
+
 		resLink = fmt.Sprintf("http://%v/download?name=%v", host, fn)
 		serverMessages = nil
 		drawMessage(serverMessages, w, resLink, "messages")
 
+		er = removeGlob("uploads", []string{fnPath, filePath})
+		if er != nil {
+			log.Println("Error removing files")
+		}
 	} else {
 		err = txr.Rollback()
 		if err != nil {
 			log.Println(err)
 		}
 	}
+}
+
+func removeGlob(path string, exclude []string) (err error) {
+	contents, err := filepath.Glob(filepath.Join(path, "*"))
+	if err != nil {
+		return
+	}
+	for _, item := range contents {
+		if slices.Contains(exclude, item) {
+			continue
+		}
+		err = os.RemoveAll(item)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func execCommandRes(ctx context.Context, tx *sql.Tx, command string) int {
