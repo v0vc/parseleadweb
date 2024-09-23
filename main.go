@@ -44,6 +44,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/", homeHandler).Methods("GET")
 	router.HandleFunc("/upload", UploadHandler).Methods("POST")
+	router.HandleFunc("/download", DownloadHandler).Methods("GET")
 	log.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
@@ -53,6 +54,29 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func DownloadHandler(w http.ResponseWriter, r *http.Request) {
+	// get the file name to download from url
+	name := r.URL.Query().Get("name")
+
+	// join to get the full file path
+	directory := filepath.Join("uploads", name)
+	var serverMessages []string
+	// open file (check if exists)
+	_, err := os.Open(directory)
+	if err != nil {
+		drawUi(serverMessages, w, "file not found")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/vnd.ms-excel")
+	// force a download with the content- disposition field
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(directory))
+
+	// serve file out.
+	http.ServeFile(w, r, directory)
 }
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -512,13 +536,14 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = resultFile.DeleteSheet("Sheet1")
-		if err != nil {
-			log.Println(err)
+		er = resultFile.DeleteSheet("Sheet1")
+		if er != nil {
+			log.Println(er)
 		}
 
-		if err = resultFile.SaveAs(fmt.Sprintf("uploads/result-%v.xlsx", time.Now().UTC().Format("20060102150405"))); err != nil {
-			log.Println(err)
+		fn := fmt.Sprintf("result-%v.xlsx", time.Now().UTC().Format("20060102150405"))
+		if er = resultFile.SaveAs("uploads/" + fn); err != nil {
+			log.Println(er)
 		}
 		execCommand(ctx, txr, del1)
 		execCommand(ctx, txr, del2)
@@ -526,10 +551,15 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		if er != nil {
 			log.Println(er)
 		}
-	}
-	er = txr.Rollback()
-	if er != nil {
-		log.Println(er)
+		resLink := fmt.Sprintf("http://localhost:8080/download?name=%v", fn)
+		serverMessages = nil
+		drawUi(serverMessages, w, resLink)
+
+	} else {
+		er = txr.Rollback()
+		if er != nil {
+			log.Println(er)
+		}
 	}
 }
 
