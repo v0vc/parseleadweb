@@ -57,6 +57,30 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
+	// очищаем таблицы
+	db, err := sql.Open(sqlite3, fmt.Sprintf("file:%v?_foreign_keys=false&cache=shared&mode=rw", dbFile))
+	if err != nil {
+		log.Println(err)
+	}
+	defer func(db *sql.DB) {
+		er := db.Close()
+		if er != nil {
+			log.Println(er)
+		}
+	}(db)
+
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		log.Println(err)
+	}
+	execCommand(ctx, tx, del1)
+	execCommand(ctx, tx, del2)
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +212,6 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 						rowAdm = append(rowAdm, strings.TrimSpace((string)(z.Text())))
 					}
 				}
-
 			}
 		}
 		if len(rowAdm) > 0 {
