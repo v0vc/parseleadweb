@@ -304,7 +304,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			if i == 0 {
 				continue
 			}
-			fmt.Printf("processing '%d' row\n", i)
+			//fmt.Printf("processing '%d' row\n", i)
 
 			celLen := len(row)
 			if celLen < 2 {
