@@ -308,7 +308,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 			celLen := len(row)
 			if celLen < 2 {
-				fmt.Printf("invalid row '%d', skipped\n", i)
+				fmt.Printf("invalid row lenght '%d', skipped\n", i+1)
 				continue
 			}
 			fio := strings.TrimSpace(row[2])
