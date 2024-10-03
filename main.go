@@ -308,7 +308,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 			celLen := len(row)
 			if celLen < 2 {
-				fmt.Printf("invalid row lenght '%d', skipped\n", i+1)
+				fmt.Printf("'%d' invalid row, skipped\n", i+1)
 				continue
 			}
 			fio := strings.TrimSpace(row[2])
@@ -326,7 +326,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			case celLen == 5:
 				_, err = inp1.ExecContext(ctx, strings.TrimSpace(row[0]), strings.TrimSpace(row[1]), strings.ToLower(fio), strings.TrimSpace(row[3]), strings.TrimSpace(row[4]), "", "", "", "", "")
 			default:
-				fmt.Printf("check row '%d', skipped\n", i)
+				fmt.Printf("check row '%d', skipped\n", i+1)
 			}
 			if err != nil {
 				log.Println(err)
