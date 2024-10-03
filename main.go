@@ -32,6 +32,8 @@ const (
 	sheet3  = "Duplicate_admin"
 	del1    = "delete from input1;"
 	del2    = "delete from input2;"
+	seq1    = "update sqlite_sequence set seq=0 where name='input1';"
+	seq2    = "update sqlite_sequence set seq=0 where name='input2';"
 	count1  = "select count(id) from input1;"
 	count2  = "select count(id) from input2;"
 	host    = "localhost:8080"
@@ -75,11 +77,19 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 	execCommand(ctx, tx, del1)
+	fmt.Println("first table cleared OK")
+	execCommand(ctx, tx, seq1)
+	fmt.Println("first sequences cleared OK")
 	execCommand(ctx, tx, del2)
+	fmt.Println("second table cleared OK")
+	execCommand(ctx, tx, seq2)
+	fmt.Println("second sequences cleared OK")
 
 	err = tx.Commit()
 	if err != nil {
 		log.Println(err)
+	} else {
+		fmt.Println("database is cleared OK")
 	}
 }
 
@@ -249,7 +259,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(er)
 			}
 		}
-		er = tx.Commit()
+		if er == nil {
+			er = tx.Commit()
+		} else {
+			er = tx.Rollback()
+		}
+
 		if er != nil {
 			log.Println(er)
 		}
@@ -289,10 +304,14 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			if i == 0 {
 				continue
 			}
-			// fmt.Printf("processing '%d' row\n", i)
-			celLen := len(row)
-			fio := strings.TrimSpace(row[2])
+			fmt.Printf("processing '%d' row\n", i)
 
+			celLen := len(row)
+			if celLen < 2 {
+				fmt.Printf("invalid row '%d', skipped\n", i)
+				continue
+			}
+			fio := strings.TrimSpace(row[2])
 			switch {
 			case celLen == 10:
 				_, err = inp1.ExecContext(ctx, strings.TrimSpace(row[0]), strings.TrimSpace(row[1]), strings.ToLower(fio), strings.TrimSpace(row[3]), strings.TrimSpace(row[4]), strings.TrimSpace(row[5]), strings.TrimSpace(row[6]), strings.TrimSpace(row[7]), strings.TrimSpace(row[8]), strings.TrimSpace(row[9]))
@@ -307,13 +326,18 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			case celLen == 5:
 				_, err = inp1.ExecContext(ctx, strings.TrimSpace(row[0]), strings.TrimSpace(row[1]), strings.ToLower(fio), strings.TrimSpace(row[3]), strings.TrimSpace(row[4]), "", "", "", "", "")
 			default:
-				fmt.Printf("invalid row: '%v'.\n", row)
+				fmt.Printf("invalid row '%d', skipped\n", i)
 			}
 			if err != nil {
 				log.Println(err)
 			}
 		}
-		er = tx.Commit()
+		if err == nil {
+			er = tx.Commit()
+		} else {
+			er = tx.Rollback()
+		}
+
 		if er != nil {
 			log.Println(er)
 		}
